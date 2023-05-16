@@ -1,0 +1,268 @@
+#WEB-CRAWLER
+import numpy as np
+import pandas as pd
+import requests
+from requests import get
+from bs4 import BeautifulSoup
+import time
+from time import *
+from time import time
+import random
+from random import randint
+from time import sleep 
+
+#*Building A Crawler** extract the publications info of some authors with profile in coventry university
+#crawl the seed page with this
+url = 'https://pureportal.coventry.ac.uk/en/organisations/school-of-humanities/publications/'
+SeedPage = requests.get(url)
+publication_links=[]
+soup= BeautifulSoup(SeedPage.text, 'html.parser')
+for h3 in soup.find_all("h3", class_= 'title'):
+    a_tag= h3.find('a')
+    links= a_tag.attrs['href'] 
+    publication_links.append(links)
+
+#This lines of code crawls profiles of the next 12 pages from seed page.
+pages= np.arange(1, 12, 1)
+more_publications= []
+for page in pages:
+    #time.sleep(random.randint(1,10))
+
+    url= 'https://pureportal.coventry.ac.uk/en/organisations/school-of-humanities/publications/?page=' + str(page)
+    results= requests.get(url)
+    soups= BeautifulSoup(results.text, 'html.parser')
+    for h31 in soups.find_all("h3", class_= 'title'):
+      a_tag1= h31.find('a')
+      links1= a_tag1.attrs['href']
+      more_publications.append(links1)
+      #if statement to extract only publications with link persons and ignore co-authors
+
+Publication_links= publication_links + more_publications
+
+len(Publication_links)
+
+print(Publication_links)
+
+#extracting authors from Publication_links
+
+Autholnk = []
+New_Publink = []
+for url in Publication_links:
+  auths = requests.get(url)
+  soup = BeautifulSoup(auths.text, "html.parser")
+  for items in soup.find_all('p', class_='relations persons'):
+    path = items.find('a')
+    if path:
+      links2 = path.attrs['href']
+      if "https://pureportal.coventry.ac.uk/en/persons/" not in links2:
+        continue
+      Autholnk.append(links2)
+      New_Publink.append(url)
+
+len(New_Publink)
+
+len(Autholnk)
+
+print(Autholnk)
+
+Publication_links = New_Publink
+
+#From the list of publication, Extract the title, authors and date for each publication and store in a list.
+PublicationTitle= []
+PublicationAuthor= []
+for cont in Publication_links:
+    content = requests.get(cont)
+    html = content.text
+    soup1 = BeautifulSoup(html, "html.parser")
+    #time.sleep(random.randint(1,10))
+
+#title list
+    for i in soup1.findAll('div', class_= 'row'):
+       div_title= i.findChild('div', class_= 'rendering')
+       title = div_title.find('span').text
+       PublicationTitle.append(title)
+# authors list
+    for i in soup1.findAll('a', class_= 'link person')[:1]:
+        author= i.findChild('span').text
+        PublicationAuthor.append(author)
+        
+
+print(PublicationTitle)
+
+print(PublicationAuthor)
+
+# all extracted contents in a dfframe
+import pandas as pd
+df= pd.DataFrame({'Title':PublicationTitle, 'Author':PublicationAuthor, 'Paperlink':Publication_links, 'Authorslink':Autholnk })
+
+#Add new id column 
+df['id'] = [i for i in range(1, len(df.values)+1)]
+
+#write dataframe into a csv file
+df.to_csv('df.csv')
+#Read csv file 
+df= pd.read_csv('df.csv')
+
+df.head(10)
+#Drop irrelevant column
+df= df.drop('Unnamed: 0', 1)
+
+df.head(20)
+
+#Preprocessing**Building Inverted Index**
+import nltk
+import string
+from nltk.corpus import stopwords
+from nltk.corpus import wordnet
+from nltk import pos_tag
+from nltk.stem import WordNetLemmatizer 
+nltk.download('averaged_perceptron_tagger')
+nltk.download('wordnet')
+nltk.download('stopwords')
+nltk.download('punkt')
+
+#Trying out lemmatization
+enter= df.loc[0,:].copy()
+#eliminating punctuations and coverting all words into lower case
+def clean_text(text):
+  text = text.lower() 
+  text = text.translate(str.maketrans('', '', string.punctuation)) 
+
+  return text
+
+#Lemmatization using POS Tag. create a function to classify words to its correct part of speech
+def get_wordnet_pos(word):
+    "Map POS tag to first character lemmatize() accepts"
+    Lemma = pos_tag([word])[0][1][0].upper()
+    Dictionary = {"J": wordnet.ADJ,
+                  "N": wordnet.NOUN,
+                  "V": wordnet.VERB,
+                  "R": wordnet.ADV}
+    return Dictionary.get(Lemma, wordnet.NOUN)
+
+#Remove all stop words
+Stop_words = stopwords.words('english') 
+
+Lemmatizer= WordNetLemmatizer()
+def Lemmatize(doc):
+    Token = nltk.word_tokenize(doc)
+    Temp = ""
+    for t in Token:
+        if t not in Stop_words:
+            Temp += Lemmatizer.lemmatize(t, get_wordnet_pos(t)) + " "
+    return Temp
+Lemmatize(doc = enter.Title)
+
+def clean_string(text):
+  text = text.lower() 
+  text = text.translate(str.maketrans('', '', string.punctuation))
+  text = Lemmatize(text)
+  return text 
+
+
+#Applying the function to every other documents in the dataframe to convert them into lower case
+Clean_df = df.copy()
+
+def convert_df(df):
+  df['Author'] = df['Author'].apply(clean_string)
+  df['Title'] = df['Title'].apply(clean_string)
+
+  %time convert_df(Clean_df)
+
+
+
+#Vectorizing 
+Clean_df['text'] = Clean_df["Title"] + " " + Clean_df["Author"]
+Clean_df = Clean_df.drop(["Author","Title", "Paperlink"], axis=1)
+
+#dropping to the processed dataframe function 
+
+def convert_df(df):
+  df = df
+  df['Author'] = df['Author'].apply(clean_string)
+  df['Title'] = df['Title'].apply(clean_string)
+  df['text'] = df['Author'] + " " + df['Title'] 
+  df = df.drop(["Author","Title", "Paperlink"], axis=1)
+  return df
+
+#Label into a dictionary 
+
+Document = Clean_df.loc[0,:].copy()
+print(Document)
+test = {}
+
+#Splitting the contents of dictionary into smaller units to build a posting list, and insert each id
+
+def indexing(Document, index):
+  WORDS = Document.text.split()
+  id = Document.id
+  for a in WORDS:
+    if a in index.keys():
+      if id not in index[a]:
+        index[a].append(id)
+    else:
+      index[a] = [id]
+  return index
+
+#Calling the function for every content in the dataframe
+Inverted_Index = indexing(Document= Document, index= {})
+print(Inverted_Index)
+
+def Indexing(df, index):
+  for i in range(len(df)):
+    Document = df.loc[i,:]
+    index = indexing(Document = Document, index = index)
+  return index
+
+indexed = Indexing(Clean_df, index = {})
+len(indexed)
+
+#Putting all the functions together to derive inputs for the indexer
+def indexer(df, index):
+    combine = convert_df(df)
+    index = Indexing(df = combine, index = indexed)
+    return index
+
+IDX = indexer(df = df, index = {})
+
+len(IDX)
+
+print(IDX)
+
+from google.colab import drive
+drive.mount('/content/drive')
+
+#**RANKING OF RESULTS**
+!pip install --upgrade gensim
+
+import numpy as np
+import gensim
+
+#*Loading the Google news pretrained word to vector model
+filename = '/content/drive/MyDrive/GoogleNews-vectors-negative300.bin'
+WordToVec = gensim.models.KeyedVectors.load_word2vec_format(filename, binary=True)
+def Vec_Avg(Word2vec_model, file):
+    file = [word for word in file if word in Word2vec_model.key_to_index] 
+    if len(file) == 0:
+      return np.zeros(500)
+    else:
+      return np.mean(Word2vec_model[file], axis=0)
+
+WORDS = Document.text.split()
+%time sample_vec = Vec_Avg(WordToVec, WORDS)
+
+#Compute a vector of words in the document, and constructs a dfbase that will store them
+
+def Ranking(df):
+  corpus = df[['id', 'text']].copy()
+  Doc_vec = {}
+  for i in range(len(corpus)):
+    row = corpus.loc[i,:]
+    text = row.text.split() 
+    Doc_vec[row.id]=Vec_Avg(WordToVec, text)
+  Doc_vec = pd.DataFrame.from_dict(data=Doc_vec, orient="index")
+  Doc_vec['id'] = Doc_vec.index
+  return Doc_vec
+
+Doc_vec = Ranking(df=df)
+Doc_vec
