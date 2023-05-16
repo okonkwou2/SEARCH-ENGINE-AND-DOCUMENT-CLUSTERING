@@ -1,0 +1,119 @@
+#"**QUERY PROCESSOR**"
+test= 'Measurement'
+print("User query: {}." .format(test))
+normalize = clean_string(test)
+print("Normalized query: {}." .format(normalize))
+
+test_split = normalize.split()
+
+#convert the test split into a function
+def processor_query(query):
+  PQ = clean_string(query)
+  return PQ.split()
+
+
+retrieves = []
+for word in test_split:
+  if word in indexed.keys():
+    retrieves.append(indexed[word])
+
+# #Searching for an intersection among all the posting list
+# def L_intersection(lists):
+#   intersect = list(set.intersection(*map(set, lists)))
+#   intersect.sort()
+#   return intersect
+# print(retrieves)
+# result = L_intersection(retrieves)
+# print(result)
+
+
+# function to retrieve publication ids that is related to the search word
+def search_engine(query, index=IDX):
+  query_split = processor_query(query)
+  retrieves = []
+  for w in query_split:
+    if w in index.keys():
+      retrieves.append(index[w])
+  if len(retrieves)>0:
+    search_result = L_intersection(retrieves)
+  else:
+      search_result = 'Not Found'
+  return search_result
+
+result= search_engine("age", indexed)
+print(result)
+
+
+# Mapping ids to important publication titles then prints out all the information related to this information
+meta_df = df.drop(['text'], axis=1).copy()
+meta_df.head(5)
+
+
+# Printing out the entire row of the retrieved query and return the rows of the retrieved query
+
+def id_df(retrieved_id, df):
+    return df[df.id.isin(retrieved_id)].reset_index(drop=True)
+
+result_meta = id_df(result, meta_df)
+result_meta.head(5)
+
+query_vec = Vec_Avg(WordToVec, test_split)
+
+result_vecs = id_df(result, Doc_vec)
+
+
+#Compute a cosine simliarity between the retrieved documents and queries
+
+def cos_similarity(a, b):
+  dot = np.dot(a, b)
+  norma = np.linalg.norm(a)
+  normb = np.linalg.norm(b)
+  cos = dot / (norma * normb)
+  return(cos)
+
+Cosine = []
+for i in range(len(result_vecs)):
+  Doc_Vecs = result_vecs.loc[i,:].drop(['id'])
+  Cosine.append(cos_similarity(Doc_Vecs, query_vec))
+result_meta['rank'] = Cosine
+
+#Convert the query processor, the indexer, with its relevancy  to return an output
+def Ranked_results(query, results):
+  query_norm = processor_query(query)
+  query_vec = Vec_Avg(WordToVec, query_norm)
+  result_vecs = id_df(results.id, Doc_vec)
+  Cosine = []
+  for i in range(len(result_vecs)):
+    Doc_Vecs = result_vecs.loc[i,:].drop(['id'])
+    Cosine.append(cos_similarity(Doc_Vecs, query_vec))
+  results['rank'] = Cosine
+  results = results.sort_values('rank', axis=0)
+  return results
+
+final_result = Ranked_results("measurement", result_meta)
+
+def print_results(df):
+  for i in range(len(df)):
+    res = df.loc[i,:]
+    print(res.Title)
+    print(res.Author)
+    if i == len(df):
+        print(res.Paperlink)
+    else:
+        print("{}\\n" .format(res.Paperlink))
+    if i == len(df):
+        print(res.Authorslink)
+    else:
+        print("{}\\n" .format(res.Authorslink))
+
+print_results(final_result)
+
+def Search(query, dat=None):
+  result = search_engine(query)
+  result = id_df(result, meta_df)
+  result = Ranked_results(query, result)
+  print_results(result)
+
+#Search engine input point
+query = input("Search:")
+Search(query)
