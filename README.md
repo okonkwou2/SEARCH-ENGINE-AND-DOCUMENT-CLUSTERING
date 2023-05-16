@@ -6,3 +6,9 @@ A search engine is a software system that is designed to carry outweb searches. 
 •	Indexing
 •	Query processor
 In this task I will be carrying out this steps in developing a search engine. The data will be obtained from the coventry university pureportal web pages. This vertical search engine specialises in retrieving only publications strictly by members of the School of Humanities (SH) at Coventry University: https://pureportal.coventry.ac.uk/en/organisations/school-of-humanities.
+
+DOCUMENT_CLUSTERING
+In this task I performed document clustering using the KMeans clustering algorithm. My document was generated manually from the cnn news rss feed. It was generated from five different news sections which are US politics, health, sports, entertainment and business rspectively. A total of 133 different documents was collected from this five various news sections. 
+
+TOPIC_MODELLING
+ I decided to carryout one extra text clustering/classifaction analysis on the dataset to compare the result using the latent dirichlet allocation (LDA) which a topic modelling algorithm. I want to determine the hidden topics in this document. The core idea is to take a matrix of documents and terms and try to decompose it into two separate matrices which are the document-topic matrix and the topic term matrix by way of dimension reduction or noise reducing technique.
